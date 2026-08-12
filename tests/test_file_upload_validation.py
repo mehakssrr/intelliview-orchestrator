@@ -38,7 +38,10 @@ def test_sanitize_filename_path_traversal():
 
 def test_sanitize_filename_characters():
     """Verify non-standard special characters are sanitized."""
-    assert sanitize_filename("my resume (1); drop table.pdf") == "my_resume__1___drop_table.pdf"
+    assert (
+        sanitize_filename("my resume (1); drop table.pdf")
+        == "my_resume__1___drop_table.pdf"
+    )
     assert sanitize_filename("...secret.txt") == "secret.txt"
 
 
@@ -59,7 +62,9 @@ def test_disguised_executable_as_pdf():
     fake_pdf = b"MZ\x90\x00\x03\x00\x00\x00" + b"\x00" * 100
     is_valid, err = validate_file_content(fake_pdf, "resume.pdf", "application/pdf")
     assert not is_valid
-    assert "Malicious or restricted file type detected" in err or "Missing '%PDF-'" in err
+    assert (
+        "Malicious or restricted file type detected" in err or "Missing '%PDF-'" in err
+    )
 
 
 def test_disguised_elf_executable_as_docx():
@@ -118,7 +123,9 @@ def test_corrupted_docx_file():
 
 def test_valid_txt_file():
     """Verify a valid UTF-8 plain text file is accepted."""
-    valid_txt = b"Jane Doe\nSoftware Engineer\nExperience: 5 years in Python and FastAPI"
+    valid_txt = (
+        b"Jane Doe\nSoftware Engineer\nExperience: 5 years in Python and FastAPI"
+    )
     is_valid, err = validate_file_content(valid_txt, "resume.txt")
     assert is_valid
     assert err == ""
@@ -146,7 +153,9 @@ def test_upload_resume_endpoint_success(monkeypatch):
         monkeypatch.setattr(
             mgr,
             "get_candidate",
-            lambda cid: {"candidate_id": cid, "name": "Upload Test"} if cid == cand_id else None,
+            lambda cid: (
+                {"candidate_id": cid, "name": "Upload Test"} if cid == cand_id else None
+            ),
         )
         monkeypatch.setattr(
             mgr,
@@ -179,7 +188,9 @@ def test_upload_resume_disguised_executable_rejected(monkeypatch):
         monkeypatch.setattr(
             mgr,
             "get_candidate",
-            lambda cid: {"candidate_id": cid, "name": "Upload Test"} if cid == cand_id else None,
+            lambda cid: (
+                {"candidate_id": cid, "name": "Upload Test"} if cid == cand_id else None
+            ),
         )
 
     fake_pdf = b"MZ\x90\x00" + b"\x00" * 50
@@ -202,7 +213,9 @@ def test_upload_resume_path_traversal_sanitized(monkeypatch):
         monkeypatch.setattr(
             mgr,
             "get_candidate",
-            lambda cid: {"candidate_id": cid, "name": "Upload Test"} if cid == cand_id else None,
+            lambda cid: (
+                {"candidate_id": cid, "name": "Upload Test"} if cid == cand_id else None
+            ),
         )
         monkeypatch.setattr(
             mgr,
@@ -233,7 +246,9 @@ def test_upload_resume_oversized_rejected(monkeypatch):
         monkeypatch.setattr(
             mgr,
             "get_candidate",
-            lambda cid: {"candidate_id": cid, "name": "Upload Test"} if cid == cand_id else None,
+            lambda cid: (
+                {"candidate_id": cid, "name": "Upload Test"} if cid == cand_id else None
+            ),
         )
 
     oversized_data = b"%PDF-1.4\n" + b"A" * (MAX_RESUME_SIZE_BYTES + 1024)

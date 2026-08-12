@@ -104,7 +104,9 @@ def test_schedule_task_with_available_worker(mock_task, scheduler):
 
     scheduler.session_manager.get_session.assert_called_once_with("session-123")
 
-    scheduler.load_balancer.get_best_worker_for_priority.assert_called_once_with("medium")
+    scheduler.load_balancer.get_best_worker_for_priority.assert_called_once_with(
+        "medium"
+    )
 
     scheduler.worker_registry.increment_active_tasks.assert_called_once_with("worker-1")
 
@@ -309,11 +311,8 @@ def test_schedule_task_dispatch_failure(mock_task, scheduler):
 @patch("orchestrator.scheduler.process_interview_session")
 def test_queue_task_failure(mock_task, scheduler):
     """
-    If there is no worker and queueing fails,
-    schedule_task() should return False.
-
-    _queue_task() handles the exception internally,
-    so mark_session_failed() is not called.
+    If there is no worker and queueing fails, schedule_task() should
+    return False and mark the session as failed with the queueing error.
     """
 
     scheduler.session_manager.get_session.return_value = {"session_id": "session-123"}
@@ -326,9 +325,11 @@ def test_queue_task_failure(mock_task, scheduler):
 
     assert result is False
 
-    # The queue failure is handled inside _queue_task(),
-    # so the outer exception handler is not triggered.
-    scheduler.session_manager.mark_session_failed.assert_not_called()
+    # The queue failure is handled inside _queue_task(), which marks the
+    # session as failed with the underlying error message.
+    scheduler.session_manager.mark_session_failed.assert_called_once_with(
+        "session-123", "Queueing error: Redis unavailable"
+    )
 
     # No worker was assigned, so worker load should not change.
     scheduler.worker_registry.increment_active_tasks.assert_not_called()
@@ -399,7 +400,9 @@ def test_can_accept_task_when_worker_available(scheduler):
     the scheduler should accept a task.
     """
 
-    scheduler.worker_registry.get_available_workers.return_value = [{"worker_id": "worker-1"}]
+    scheduler.worker_registry.get_available_workers.return_value = [
+        {"worker_id": "worker-1"}
+    ]
 
     result = scheduler.can_accept_task()
 
@@ -435,7 +438,9 @@ def test_estimated_wait_time_with_available_worker(scheduler):
     should be zero.
     """
 
-    scheduler.worker_registry.get_available_workers.return_value = [{"worker_id": "worker-1"}]
+    scheduler.worker_registry.get_available_workers.return_value = [
+        {"worker_id": "worker-1"}
+    ]
 
     result = scheduler.get_estimated_wait_time()
 

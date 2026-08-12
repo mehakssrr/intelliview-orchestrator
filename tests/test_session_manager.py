@@ -65,10 +65,13 @@ def make_db_session(scalar_result=None):
 
 class TestCreateSession:
     def test_creates_db_record_and_syncs_redis(self, manager):
-        db = make_db_session()
+        existing_candidate = MagicMock()  # candidate already exists → skip auto-create
+        db = make_db_session(scalar_result=existing_candidate)
         with patch.object(sm_module, "SessionLocal", return_value=db):
             session_id = manager.create_session(
-                candidate_id="cand_1", position="Backend Engineer", candidate_name="Asha"
+                candidate_id="cand_1",
+                position="Backend Engineer",
+                candidate_name="Asha",
             )
 
         assert session_id.startswith("session_")
@@ -89,6 +92,20 @@ class TestCreateSession:
         assert synced_data["candidate_name"] == "Asha"
         assert synced_data["risk_score"] is None
 
+    def test_auto_creates_missing_candidate(self, manager):
+        # candidate lookup returns None → should auto-create a candidate
+        # record before creating the interview session
+        db = make_db_session(scalar_result=None)
+        with patch.object(sm_module, "SessionLocal", return_value=db):
+            manager.create_session(candidate_id="cand_new", candidate_name="Riya")
+
+        assert db.add.call_count == 2
+        added_records = [call.args[0] for call in db.add.call_args_list]
+        assert added_records[0].candidate_id == "cand_new"
+        assert added_records[0].name == "Riya"
+        assert added_records[1].candidate_id == "cand_new"
+        db.flush.assert_called_once()
+
     def test_defaults_position_and_name_when_omitted(self, manager):
         db = make_db_session()
         with patch.object(sm_module, "SessionLocal", return_value=db):
@@ -101,7 +118,10 @@ class TestCreateSession:
     def test_rolls_back_and_reraises_on_db_error(self, manager):
         db = make_db_session()
         db.commit.side_effect = RuntimeError("db unavailable")
-        with patch.object(sm_module, "SessionLocal", return_value=db), pytest.raises(RuntimeError):
+        with (
+            patch.object(sm_module, "SessionLocal", return_value=db),
+            pytest.raises(RuntimeError),
+        ):
             manager.create_session(candidate_id="cand_3")
 
         db.rollback.assert_called_once()
@@ -124,13 +144,17 @@ class TestUpdateSessionStatus:
     def test_valid_transition_updates_db_and_redis(self, manager):
         interview = make_interview(SessionManager.CREATED)
         db = make_db_session(scalar_result=interview)
-        manager.state_sync.get_session_state.return_value = {"status": SessionManager.CREATED}
+        manager.state_sync.get_session_state.return_value = {
+            "status": SessionManager.CREATED
+        }
 
         with (
             patch.object(sm_module, "SessionLocal", return_value=db),
             patch.object(sm_module, "is_circuit_open", return_value=False),
         ):
-            result = manager.update_session_status("session_abc123", SessionManager.QUEUED)
+            result = manager.update_session_status(
+                "session_abc123", SessionManager.QUEUED
+            )
 
         assert result is True
         assert interview.status == SessionManager.QUEUED
@@ -142,14 +166,18 @@ class TestUpdateSessionStatus:
     def test_merges_metadata_into_redis_payload(self, manager):
         interview = make_interview(SessionManager.QUEUED)
         db = make_db_session(scalar_result=interview)
-        manager.state_sync.get_session_state.return_value = {"status": SessionManager.QUEUED}
+        manager.state_sync.get_session_state.return_value = {
+            "status": SessionManager.QUEUED
+        }
 
         with (
             patch.object(sm_module, "SessionLocal", return_value=db),
             patch.object(sm_module, "is_circuit_open", return_value=False),
         ):
             manager.update_session_status(
-                "session_abc123", SessionManager.PROCESSING, metadata={"worker": "node-3"}
+                "session_abc123",
+                SessionManager.PROCESSING,
+                metadata={"worker": "node-3"},
             )
 
         pushed_data = manager.state_sync.set_session_state.call_args[0][1]
@@ -161,7 +189,9 @@ class TestUpdateSessionStatus:
         db = make_db_session(scalar_result=interview)
 
         with patch.object(sm_module, "SessionLocal", return_value=db):
-            result = manager.update_session_status("session_abc123", SessionManager.QUEUED)
+            result = manager.update_session_status(
+                "session_abc123", SessionManager.QUEUED
+            )
 
         assert result is False
         assert interview.status == SessionManager.COMPLETED  # unchanged
@@ -173,7 +203,9 @@ class TestUpdateSessionStatus:
         db = make_db_session(scalar_result=interview)
 
         with patch.object(sm_module, "SessionLocal", return_value=db):
-            result = manager.update_session_status("session_abc123", SessionManager.QUEUED)
+            result = manager.update_session_status(
+                "session_abc123", SessionManager.QUEUED
+            )
 
         assert result is False
         db.commit.assert_not_called()
@@ -181,7 +213,9 @@ class TestUpdateSessionStatus:
     def test_session_not_found_returns_false(self, manager):
         db = make_db_session(scalar_result=None)
         with patch.object(sm_module, "SessionLocal", return_value=db):
-            result = manager.update_session_status("does_not_exist", SessionManager.QUEUED)
+            result = manager.update_session_status(
+                "does_not_exist", SessionManager.QUEUED
+            )
 
         assert result is False
         db.commit.assert_not_called()
@@ -194,7 +228,9 @@ class TestUpdateSessionStatus:
             patch.object(sm_module, "SessionLocal", return_value=db),
             patch.object(sm_module, "is_circuit_open", return_value=True),
         ):
-            result = manager.update_session_status("session_abc123", SessionManager.QUEUED)
+            result = manager.update_session_status(
+                "session_abc123", SessionManager.QUEUED
+            )
 
         assert result is True  # DB write still succeeds
         assert interview.status == SessionManager.QUEUED
@@ -207,7 +243,9 @@ class TestUpdateSessionStatus:
         db.commit.side_effect = RuntimeError("db unavailable")
 
         with patch.object(sm_module, "SessionLocal", return_value=db):
-            result = manager.update_session_status("session_abc123", SessionManager.QUEUED)
+            result = manager.update_session_status(
+                "session_abc123", SessionManager.QUEUED
+            )
 
         assert result is False
         db.rollback.assert_called_once()
@@ -215,7 +253,9 @@ class TestUpdateSessionStatus:
     def test_broadcasts_update_when_event_loop_is_running(self, manager):
         interview = make_interview(SessionManager.CREATED)
         db = make_db_session(scalar_result=interview)
-        manager.state_sync.get_session_state.return_value = {"status": SessionManager.CREATED}
+        manager.state_sync.get_session_state.return_value = {
+            "status": SessionManager.CREATED
+        }
 
         async def scenario():
             with (
@@ -245,7 +285,9 @@ class TestUpdateSessionStatus:
 
 class TestGetSession:
     def test_returns_cached_value_without_hitting_db(self, manager):
-        manager.state_sync.get_session_state.return_value = {"session_id": "session_abc123"}
+        manager.state_sync.get_session_state.return_value = {
+            "session_id": "session_abc123"
+        }
 
         with patch.object(sm_module, "SessionLocal") as mock_session_local:
             result = manager.get_session("session_abc123")
@@ -264,7 +306,9 @@ class TestGetSession:
         assert result["session_id"] == "session_abc123"
         assert result["status"] == SessionManager.EVALUATING
         assert result["risk_score"] == 0.42
-        manager.state_sync.set_session_state.assert_called_once_with("session_abc123", result)
+        manager.state_sync.set_session_state.assert_called_once_with(
+            "session_abc123", result
+        )
         db.close.assert_called_once()
 
     def test_returns_none_when_not_found_anywhere(self, manager):
@@ -311,12 +355,16 @@ class TestGetSession:
 
 class TestMarkSessionFailed:
     def test_delegates_to_update_session_status_with_failed(self, manager):
-        with patch.object(manager, "update_session_status", return_value=True) as mock_update:
+        with patch.object(
+            manager, "update_session_status", return_value=True
+        ) as mock_update:
             result = manager.mark_session_failed("session_abc123", "video decode error")
 
         assert result is True
         mock_update.assert_called_once_with(
-            "session_abc123", SessionManager.FAILED, {"error_message": "video decode error"}
+            "session_abc123",
+            SessionManager.FAILED,
+            {"error_message": "video decode error"},
         )
 
     def test_propagates_false_from_update(self, manager):
@@ -335,7 +383,9 @@ class TestMarkSessionCompleted:
     def test_marks_completed_and_syncs_redis(self, manager):
         interview = make_interview(SessionManager.EVALUATING)
         db = make_db_session(scalar_result=interview)
-        manager.state_sync.get_session_state.return_value = {"status": SessionManager.EVALUATING}
+        manager.state_sync.get_session_state.return_value = {
+            "status": SessionManager.EVALUATING
+        }
 
         with (
             patch.object(sm_module, "SessionLocal", return_value=db),
@@ -440,7 +490,11 @@ class TestIsValidTransition:
         assert manager._is_valid_transition(current, new) is False
 
     def test_terminal_states_have_no_outbound_transitions(self, manager):
-        for terminal in (SessionManager.COMPLETED, SessionManager.FAILED, SessionManager.CANCELLED):
+        for terminal in (
+            SessionManager.COMPLETED,
+            SessionManager.FAILED,
+            SessionManager.CANCELLED,
+        ):
             assert SessionManager.VALID_TRANSITIONS[terminal] == []
 
 
@@ -452,13 +506,17 @@ class TestIsValidTransition:
 class TestBroadcastStatus:
     def test_noop_when_no_event_loop_is_running(self):
         # Called from plain sync code (no running loop) -> must not raise.
-        SessionManager._broadcast_status("session_abc123", SessionManager.QUEUED, None, {})
+        SessionManager._broadcast_status(
+            "session_abc123", SessionManager.QUEUED, None, {}
+        )
 
     def test_schedules_broadcast_when_loop_is_running(self):
         async def scenario():
             with patch.object(sm_module, "ws_manager") as mock_ws:
                 mock_ws.broadcast_session_update = AsyncMock()
-                SessionManager._broadcast_status("session_abc123", SessionManager.EVALUATING, 0.5, {"k": "v"})
+                SessionManager._broadcast_status(
+                    "session_abc123", SessionManager.EVALUATING, 0.5, {"k": "v"}
+                )
                 await asyncio.sleep(0)
                 mock_ws.broadcast_session_update.assert_awaited_once_with(
                     session_id="session_abc123",
@@ -472,8 +530,12 @@ class TestBroadcastStatus:
     def test_broadcast_failure_is_swallowed_not_raised(self):
         async def scenario():
             with patch.object(sm_module, "ws_manager") as mock_ws:
-                mock_ws.broadcast_session_update = AsyncMock(side_effect=RuntimeError("ws down"))
-                SessionManager._broadcast_status("session_abc123", SessionManager.FAILED, None, {})
+                mock_ws.broadcast_session_update = AsyncMock(
+                    side_effect=RuntimeError("ws down")
+                )
+                SessionManager._broadcast_status(
+                    "session_abc123", SessionManager.FAILED, None, {}
+                )
                 # Should not raise even though the underlying broadcast failed.
                 await asyncio.sleep(0)
 

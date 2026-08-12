@@ -75,7 +75,9 @@ def sanitize_filename(filename: str | None) -> str:
     return filename
 
 
-def validate_file_content(content: bytes, filename: str, content_type: str | None = None) -> tuple[bool, str]:
+def validate_file_content(
+    content: bytes, filename: str, content_type: str | None = None
+) -> tuple[bool, str]:
     """
     Validate uploaded file content against its extension and content headers.
 
@@ -103,7 +105,9 @@ def validate_file_content(content: bytes, filename: str, content_type: str | Non
     header = content[:1024]
     for magic, desc in DANGEROUS_MAGIC_SIGNATURES:
         if header.startswith(magic):
-            logger.warning(f"Blocked file upload '{filename}': matched dangerous signature '{desc}'")
+            logger.warning(
+                f"Blocked file upload '{filename}': matched dangerous signature '{desc}'"
+            )
             return (
                 False,
                 f"File content security policy violation: Malicious or restricted file type detected ({desc})",
@@ -123,8 +127,14 @@ def validate_file_content(content: bytes, filename: str, content_type: str | Non
             with zipfile.ZipFile(BytesIO(content)) as zf:
                 # Check for standard DOCX internal component
                 namelist = zf.namelist()
-                if "[Content_Types].xml" not in namelist and "word/document.xml" not in namelist:
-                    return False, "Invalid DOCX file: Missing WordprocessingML document structure"
+                if (
+                    "[Content_Types].xml" not in namelist
+                    and "word/document.xml" not in namelist
+                ):
+                    return (
+                        False,
+                        "Invalid DOCX file: Missing WordprocessingML document structure",
+                    )
         except zipfile.BadZipFile:
             return False, "Invalid DOCX file: Corrupted ZIP archive"
 
@@ -147,7 +157,9 @@ def validate_file_content(content: bytes, filename: str, content_type: str | Non
     return True, ""
 
 
-async def validate_upload_stream(file: UploadFile, max_bytes: int = MAX_RESUME_SIZE_BYTES) -> bytes:
+async def validate_upload_stream(
+    file: UploadFile, max_bytes: int = MAX_RESUME_SIZE_BYTES
+) -> bytes:
     """
     Safely reads an uploaded file from a stream up to `max_bytes`.
     If the file exceeds `max_bytes`, raises an HTTP 413 exception immediately.
@@ -163,7 +175,9 @@ async def validate_upload_stream(file: UploadFile, max_bytes: int = MAX_RESUME_S
         total_bytes += len(chunk)
         if total_bytes > max_bytes:
             # Consume remaining or abort to prevent uncontrolled resource exhaustion
-            logger.warning(f"File upload size limit exceeded: {total_bytes} bytes > {max_bytes} bytes limit")
+            logger.warning(
+                f"File upload size limit exceeded: {total_bytes} bytes > {max_bytes} bytes limit"
+            )
             raise HTTPException(
                 status_code=413,
                 detail=f"Uploaded file exceeds maximum allowed size of {max_bytes // (1024 * 1024)} MB",

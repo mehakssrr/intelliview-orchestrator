@@ -135,8 +135,7 @@ LOAD_TEST_MAX_FAILURE_RATE (default 5%), so this can gate CI later.
 import os
 import random
 
-from locust import HttpUser, task, between, events
-
+from locust import HttpUser, between, events, task
 
 # --------------------------------------------------------------------------
 # CONFIG
@@ -218,6 +217,7 @@ def _is_rate_limited(resp) -> bool:
 # --------------------------------------------------------------------------
 # User behavior
 # --------------------------------------------------------------------------
+
 
 class InterviewCandidate(HttpUser):
     """One instance = one simulated candidate running a full interview."""
@@ -323,7 +323,9 @@ class InterviewCandidate(HttpUser):
             if _is_rate_limited(resp):
                 return None
             if resp.status_code == 401:
-                resp.failure("401 Unauthorized — check LOAD_TEST_API_KEY matches server's API_TOKEN")
+                resp.failure(
+                    "401 Unauthorized — check LOAD_TEST_API_KEY matches server's API_TOKEN"
+                )
                 return None
             if resp.status_code not in (200, 201):
                 resp.failure(f"start-interview failed: HTTP {resp.status_code}")
@@ -341,6 +343,7 @@ class InterviewCandidate(HttpUser):
 
     def _poll_status_after_create(self, session_id):
         import time
+
         path = SESSION_STATUS_PATH.format(session_id=session_id)
         for _ in range(POST_CREATE_MAX_POLLS):
             with self.client.get(
@@ -366,6 +369,7 @@ class InterviewCandidate(HttpUser):
 
     def _think(self):
         import time
+
         time.sleep(random.uniform(MIN_THINK_TIME, MAX_THINK_TIME))
 
     def _ask_question(self, session_id):
@@ -437,6 +441,7 @@ class InterviewCandidate(HttpUser):
 # Custom summary printed at the end of every run.
 # --------------------------------------------------------------------------
 
+
 @events.quitting.add_listener
 def _print_summary(environment, **kwargs):
     stats = environment.stats
@@ -462,10 +467,16 @@ def _print_summary(environment, **kwargs):
     print(f"Total failures:        {total.num_failures}")
     print(f"  - rate_limited (429):{rate_limited_count}")
     print(f"  - other failures:    {other_failure_count}")
-    fail_rate = (total.num_failures / total.num_requests * 100) if total.num_requests else 0
-    other_fail_rate = (other_failure_count / total.num_requests * 100) if total.num_requests else 0
+    fail_rate = (
+        (total.num_failures / total.num_requests * 100) if total.num_requests else 0
+    )
+    other_fail_rate = (
+        (other_failure_count / total.num_requests * 100) if total.num_requests else 0
+    )
     print(f"Total failure rate:    {fail_rate:.2f}%")
-    print(f"Non-rate-limit rate:   {other_fail_rate:.2f}%  <-- use THIS to judge real errors")
+    print(
+        f"Non-rate-limit rate:   {other_fail_rate:.2f}%  <-- use THIS to judge real errors"
+    )
     print(f"Median resp (ms):      {total.median_response_time}")
     print(f"95th pct (ms):         {total.get_response_time_percentile(0.95)}")
     print(f"99th pct (ms):         {total.get_response_time_percentile(0.99)}")

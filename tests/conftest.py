@@ -36,14 +36,6 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Point at a local instance by default; tests can override via env.
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-os.environ.setdefault("POSTGRES_HOST", "localhost")
-os.environ.setdefault("POSTGRES_DB", "ai_interview_db")
-os.environ.setdefault("POSTGRES_USER", "postgres")
-os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
-os.environ.setdefault("API_TOKEN", "test-token")
-
 
 @pytest.fixture(scope="session")
 def postgres_container():
@@ -81,3 +73,30 @@ def celery_app_fixture():
     from workers.celery_app import celery_app
 
     return celery_app
+
+
+# ---------------------------------------------------------------------------
+# Unit-test fixtures — pure mocks, no live Postgres/Redis required.
+# Use these in tests that shouldn't depend on docker-compose being up.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_db_session(mocker):
+    """Fake SQLAlchemy session factory — patches database.db.SessionLocal."""
+    session = mocker.MagicMock()
+    mocker.patch("database.db.SessionLocal", return_value=session)
+    return session
+
+
+@pytest.fixture
+def mock_state_sync(mocker):
+    """Fake Redis-backed StateSynchronizer for session state caching."""
+    mock_cls = mocker.patch("orchestrator.state_sync.StateSynchronizer", autospec=True)
+    return mock_cls.return_value
+
+
+@pytest.fixture
+def mock_circuit_closed(mocker):
+    """Defaults the Redis circuit breaker to closed (Redis 'available')."""
+    return mocker.patch("orchestrator.redis_client.is_circuit_open", return_value=False)
