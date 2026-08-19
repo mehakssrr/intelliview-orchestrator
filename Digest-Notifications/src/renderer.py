@@ -70,6 +70,7 @@ def render_digest_html(
         theme=theme,
     )
 
+
 def render_digest_text(payload: DigestPayload, unsubscribe_url: str) -> str:
     """
     Renders a plain-text fallback version of the digest.
