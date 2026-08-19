@@ -31,6 +31,7 @@ def render_digest_html(
     unsubscribe_url: str,
     env: Environment | None = None,
     template_name: str = DEFAULT_TEMPLATE_NAME,
+    theme: str = "light",
 ) -> str:
     """
     Renders the given digest payload to an HTML string.
@@ -44,7 +45,12 @@ def render_digest_html(
             module's own templates/ folder is used.
         template_name: override if the host project renames/relocates
             the template.
+        theme: color theme for the HTML digest. Supported values are
+            "light" and "dark".
     """
+    if theme not in {"light", "dark"}:
+        raise ValueError("theme must be either 'light' or 'dark'")
+
     environment = env or _default_environment()
     template: Template = environment.get_template(template_name)
 
@@ -61,8 +67,8 @@ def render_digest_html(
         generated_at=payload.generated_at.strftime("%d %b %Y, %H:%M UTC"),
         grouped_interviews=grouped_for_template,
         unsubscribe_url=unsubscribe_url,
+        theme=theme,
     )
-
 
 def render_digest_text(payload: DigestPayload, unsubscribe_url: str) -> str:
     """
