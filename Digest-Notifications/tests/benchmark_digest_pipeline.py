@@ -23,6 +23,7 @@ Notes / limitations (see report Section 6.2 for full discussion):
 """
 
 import argparse
+import datetime
 import os
 import sys
 import timeit
@@ -31,7 +32,58 @@ SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")
 sys.path.insert(0, os.path.abspath(SRC_DIR))
 
 from digest import _build_payload, get_upcoming_interviews
+from digest_builder import build_digest
+from models import DigestRecipient, InterviewEvent
 from renderer import render_digest_html, render_digest_text
+
+BUILD_TIME_THRESHOLD_MS = 100.0
+
+
+def make_candidates(count: int, ref_date: str) -> list[InterviewEvent]:
+    base_date = datetime.datetime.fromisoformat(ref_date)
+
+    return [
+        InterviewEvent(
+            interview_id=f"bench-{i}",
+            candidate_name=f"Candidate {i}",
+            role_title="Software Engineer",
+            interviewer_name="Benchmark Interviewer",
+            scheduled_at=base_date + datetime.timedelta(minutes=i),
+        )
+        for i in range(count)
+    ]
+
+
+def benchmark_digest_build(runs: int, ref_date: str) -> None:
+    recipient = DigestRecipient(
+        user_id="u-benchmark",
+        email="benchmark@example.com",
+        display_name="Benchmark Recruiter",
+    )
+
+    print("\nDigest build benchmark")
+    print("-" * 60)
+
+    for candidate_count in (1, 100, 1000):
+        candidates = make_candidates(candidate_count, ref_date)
+
+        elapsed = timeit.timeit(
+            lambda: build_digest(
+                recipient,
+                candidates,
+                now=datetime.datetime.fromisoformat(ref_date),
+            ),
+            number=runs,
+        )
+
+        avg_ms = (elapsed / runs) * 1000
+        status = "PASS" if avg_ms <= BUILD_TIME_THRESHOLD_MS else "FLAG"
+
+        print(
+            f"{candidate_count:>4} candidates : " f"{avg_ms:>10.3f} ms avg  [{status}]"
+        )
+
+    print(f"\nThreshold: {BUILD_TIME_THRESHOLD_MS:.1f} ms")
 
 
 def run_benchmark(runs: int, ref_date: str) -> None:
@@ -111,4 +163,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    run_benchmark(runs=args.runs, ref_date=args.ref_date)
+    benchmark_digest_build(runs=args.runs, ref_date=args.ref_date)
