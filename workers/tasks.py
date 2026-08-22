@@ -35,6 +35,7 @@ from orchestrator.worker_registry import WorkerRegistry
 from workers.celery_app import celery_app
 from workers.evaluation_pipeline import evaluate_answers
 from workers.risk_engine import RiskScoringEngine
+from notification_deduplication.storage import cleanup_expired_keys
 
 logger = logging.getLogger(__name__)
 
@@ -335,3 +336,16 @@ def process_interview_session(self, session_id):
         )
 
         raise self.retry(exc=exc, countdown=retry_delay)
+
+
+# ---------------------------------------------------------------------------
+# Deduplication storage cleanup
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(name="workers.tasks.cleanup_expired_dedup_keys")
+def cleanup_expired_dedup_keys():
+    """Periodic task: remove expired dedup keys from notification_store."""
+    removed = cleanup_expired_keys()
+    logger.info("Dedup cleanup: removed %d expired keys", removed)
+    return removed
