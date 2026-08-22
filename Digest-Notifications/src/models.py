@@ -64,7 +64,7 @@ class DigestPayload:
 
     recipient: DigestRecipient
     generated_at: datetime
-    grouped_interviews: "dict[str, list[InterviewEvent]]" = field(default_factory=dict)
+    grouped_interviews: dict[str, list[InterviewEvent]] = field(default_factory=dict)
     total_upcoming_count: int = 0
 
     @property
