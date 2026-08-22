@@ -64,9 +64,23 @@ class DigestPayload:
 
     recipient: DigestRecipient
     generated_at: datetime
-    grouped_interviews: "dict[str, list[InterviewEvent]]" = field(default_factory=dict)
+    grouped_interviews: dict[str, list[InterviewEvent]] = field(default_factory=dict)
     total_upcoming_count: int = 0
 
     @property
     def total_count(self) -> int:
         return sum(len(v) for v in self.grouped_interviews.values())
+
+    @property
+    def session_summaries(self) -> list[dict[str, str | float | None]]:
+        """Return each digest session in the required summary format."""
+        return [
+            {
+                "candidate_name": event.candidate_name,
+                "role": event.role_title,
+                "risk_score": event.risk_score,
+                "session_id": event.session_id or event.interview_id,
+            }
+            for events in self.grouped_interviews.values()
+            for event in events
+        ]
