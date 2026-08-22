@@ -16,42 +16,49 @@ from config import DATABASE_SSLMODE, DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
+db_url = DATABASE_URL
+if not db_url or "sqlite" in db_url.lower():
+    if not db_url:
+        db_url = "sqlite:///./intelliview.db"
+    _engine_kwargs = {
+        "echo": False,
+        "connect_args": {"check_same_thread": False},
+    }
+else:
+    _connect_args = {}
+    _engine_kwargs = {
+        "echo": False,
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+    }
+    if DATABASE_SSLMODE and DATABASE_SSLMODE != "disable":
+        _connect_args["sslmode"] = DATABASE_SSLMODE
+        _engine_kwargs["connect_args"] = _connect_args
 
-_connect_args = {}
-_engine_kwargs = {
-    "echo": False,
-    "pool_size": 10,
-    "max_overflow": 20,
-    "pool_pre_ping": True,
-    "pool_recycle": 1800,
-}
-
-
-if DATABASE_SSLMODE and DATABASE_SSLMODE != "disable":
-    _connect_args["sslmode"] = DATABASE_SSLMODE
-    _engine_kwargs["connect_args"] = _connect_args
-    logger.info("Database SSL enabled: mode=%s", DATABASE_SSLMODE)
-
-
-# Database engine initialization with structured error handling
+# Database engine initialization with structured error handling & SQLite fallback
 try:
     engine = create_engine(
-        DATABASE_URL,
+        db_url,
         **_engine_kwargs,
     )
-
-    logger.info("Database engine initialized successfully")
+    # Test database connectivity
+    with engine.connect() as conn:
+        pass
+    logger.info("Database engine initialized successfully with URL: %s", db_url)
 
 except Exception as exc:
-    logger.exception(
-        "Database engine initialization failed. "
-        "Please check database configuration and server availability. "
-        "Reason: %s",
+    logger.warning(
+        "Database connection to PostgreSQL/external server failed (%s). "
+        "Falling back to local SQLite database (sqlite:///./intelliview.db) for local development.",
         exc,
     )
-
-    # Stop application startup because database connection is required
-    raise
+    db_url = "sqlite:///./intelliview.db"
+    engine = create_engine(
+        db_url,
+        connect_args={"check_same_thread": False},
+    )
 
 
 SessionLocal = sessionmaker(

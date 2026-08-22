@@ -78,6 +78,7 @@ function Dialog({ open, onOpenChange, children }) {
         <motion.div
           role="dialog"
           aria-modal="true"
+          data-testid="session-dialog"
           ref={containerRef}
           initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}

@@ -247,3 +247,8 @@ class InterviewTemplate(Base):
 
     def __repr__(self):
         return f"<InterviewTemplate(template_id='{self.template_id}', name='{self.name}', type='{self.interview_type}')>"
+
+
+from database.models.interview_schedule import (  # noqa: F401
+    InterviewSchedule,
+)

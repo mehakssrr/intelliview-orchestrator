@@ -1,0 +1,3 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,POST /candidates (register),CatchResponseError('candidate registration failed: HTTP 500'),74,2026-08-10T05:57:39Z,2026-08-10T06:02:35Z
+POST,POST /start-interview,"CatchResponseError(""401 Unauthorized — check LOAD_TEST_API_KEY matches server's API_TOKEN"")",3559,2026-08-10T05:57:36Z,2026-08-10T06:02:35Z

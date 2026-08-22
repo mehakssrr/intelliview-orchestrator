@@ -41,6 +41,7 @@ class WorkerAgent:
         # Process-local counter used for worker heartbeats.
         # This is accurate only when running with the 'solo' pool.
         self.active_tasks = 0
+        self.draining = False
 
         self.tasks_completed = 0  # track total completed tasks
         self.max_tasks_before_restart = int(

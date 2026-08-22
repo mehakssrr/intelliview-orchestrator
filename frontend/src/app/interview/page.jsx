@@ -217,7 +217,7 @@ export default function InterviewPage() {
           </Card>
 
           <Card title="Audio Visualization">
-            <div className="relative flex items-end gap-[2px] h-16 overflow-hidden">
+          <div className="relative flex items-end gap-[2px] h-16 overflow-hidden">
               {audioLevels.map((level, i) => (
                 <div
                   key={i}
@@ -235,13 +235,13 @@ export default function InterviewPage() {
                 />
               ))}
               {!videoEnabled && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-muted">
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-muted">
                   <VideoOff size={48} className="mb-3 opacity-30" />
                   <p className="text-sm">Camera is off</p>
                 </div>
               )}
               {isPaused && videoEnabled && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
                   <div className="flex items-center gap-2 rounded-md bg-bg-panel px-4 py-2 text-sm text-zinc-300">
                     <Pause size={16} />
                     Paused
@@ -249,7 +249,7 @@ export default function InterviewPage() {
                 </div>
               )}
               {isLive && activeSession && (
-                <div className="absolute left-3 top-3 rounded-md bg-black/60 px-2 py-1 text-[10px] font-mono text-zinc-300">
+                <div className="pointer-events-none left-3 top-3 rounded-md bg-black/60 px-2 py-1 text-[10px] font-mono text-zinc-300">
                   {activeSession}
                 </div>
               )}

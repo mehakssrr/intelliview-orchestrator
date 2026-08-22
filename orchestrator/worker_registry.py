@@ -123,6 +123,7 @@ class WorkerRegistry:
         the local worker registry accordingly."""
         if not self.redis_client:
             return
+        pubsub = None
         try:
             pubsub = self.redis_client.raw.pubsub()
             await pubsub.subscribe(self.SYNC_CHANNEL)
@@ -170,11 +171,12 @@ class WorkerRegistry:
         except Exception as exc:
             logger.warning("Pub/Sub listener error: %s", exc)
         finally:
-            try:
-                await pubsub.unsubscribe(self.SYNC_CHANNEL)
-                await pubsub.close()
-            except Exception:
-                pass
+            if pubsub:
+                try:
+                    await pubsub.unsubscribe(self.SYNC_CHANNEL)
+                    await pubsub.close()
+                except Exception:
+                    pass
 
     def register_worker(
         self, worker_id: str, capacity: int = 4, weight: int | None = None
@@ -220,7 +222,7 @@ class WorkerRegistry:
                 payload = {
                     k: (
                         int(v)
-                        if isinstance(v, (int, float))
+                        if isinstance(v, int | float)
                         and k
                         in {
                             "capacity",
@@ -602,6 +604,21 @@ class WorkerRegistry:
                 if last_hb < timeout_threshold:
                     unhealthy.append(worker_id)
                     worker["status"] = "unhealthy"
+                WORKERS_HEALTHY.set(
+                    sum(
+                        1
+                        for w in self.local_workers.values()
+                        if w["status"] == "healthy"
+                    )
+                )
+
+                WORKERS_UNHEALTHY.set(
+                    sum(
+                        1
+                        for w in self.local_workers.values()
+                        if w["status"] == "unhealthy"
+                    )
+                )
 
         # Broadcast if status changes to unhealthy
         for wid in unhealthy:

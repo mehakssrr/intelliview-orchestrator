@@ -1,4 +1,5 @@
 "use client";
+import OnboardingTour from "@/components/OnboardingTour";
 import { reportWebVitals } from "@/lib/webVitals";
 import { Suspense, lazy, useEffect, useState, useCallback } from "react";
 import { SWRConfig } from "swr";
@@ -11,6 +12,7 @@ import { useUIStore } from "@/lib/ui-store";
 import { endpoints, api } from "@/lib/api";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { NotificationProvider } from "@/lib/notification-context";
 
 const CommandPalette = lazy(() =>
   import("@/components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
@@ -87,11 +89,11 @@ useEffect(() => {
     };
     const onPalette = () => setPaletteOpen(true);
     const onHelp = () => setHelpOpen(true);
-    
+
     document.addEventListener("keydown", onKey);
     window.addEventListener("open-command-palette", onPalette);
     window.addEventListener("open-shortcuts-help", onHelp);
-    
+
     return () => {
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("open-command-palette", onPalette);
@@ -145,7 +147,7 @@ useEffect(() => {
 
   return (
     <SWRConfig
-      value={{
+value={{
         fetcher: swrFetcher,
         revalidateOnFocus: true,
         refreshInterval: 5000,
@@ -157,6 +159,8 @@ useEffect(() => {
         },
       }}
     >
+      <NotificationProvider>
+        <OnboardingTour />
       <ErrorBoundary>{children}</ErrorBoundary>
       <Suspense fallback={null}>
         <ScreenLockWrapper />
@@ -171,6 +175,7 @@ useEffect(() => {
           </Suspense>
         </MobileSidebar>
       </Suspense>
+      </NotificationProvider>
     </SWRConfig>
   );
 }

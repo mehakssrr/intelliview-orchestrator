@@ -78,7 +78,6 @@ ignore = [
     "UP031",  # % formatting — kept for log clarity
     "RUF002", # ambiguous dashes in docstrings
     "ASYNC230",
-    "ASYNC240",
     "SIM105", # contextlib.suppress — try/except is clearer with logging
 ] 
 
@@ -95,11 +94,26 @@ known-first-party = ["orchestrator", "workers", "monitoring", "database", "scrip
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers -m 'not e2e'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "unit: pure-logic unit tests",
     "contract: API contract tests",
     "e2e: end-to-end smoke tests (require a running stack)",
+    "integration: tests requiring real Postgres/Redis via testcontainers",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:celery.*",
+]
+
+[tool.coverage.run]
+source = ["orchestrator", "workers", "monitoring", "database", "scripts"]
+omit = ["tests/*", "*/migrations/*", "*/__init__.py", "locustfile.py", "scripts/*", "cv_service/*", "routers/admin.py"]
+
+[tool.coverage.report]
+skip_empty = true
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
 ]

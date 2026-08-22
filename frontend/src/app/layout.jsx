@@ -1,4 +1,3 @@
-import { Inter } from "next/font/google";
 import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import { ClientProviders } from "./providers";
@@ -6,10 +5,9 @@ import WebVitals from "@/components/WebVitals";
 import "./globals.css";
 import { jsx, jsxs } from "react/jsx-runtime";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
+// Use system font stack instead of Google Fonts to avoid network dependency
+// This prevents NextFontError when fonts.googleapis.com is unreachable
+const fontClassName = "font-sans";
 
 const metadata = {
   title: "AI-Intelliview Orchestrator",
@@ -22,7 +20,7 @@ function RootLayout({ children }) {
     className: "dark",
     suppressHydrationWarning: true,
     children: /* @__PURE__ */ jsxs("body", {
-      className: inter.variable + " font-sans",
+      className: fontClassName,
       children: [
         /* Web Vitals Monitoring */
         /* @__PURE__ */ jsx(WebVitals, {}),

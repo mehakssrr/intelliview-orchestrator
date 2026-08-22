@@ -20,6 +20,27 @@ class CreateCandidateRequest(BaseModel):
     skills: list[str] | None = None
 
 
+class BulkCandidateItem(BaseModel):
+    """A single candidate row within a bulk import request.
+
+    Note: `position` and `phone` are accepted from the frontend CSV import
+    payload but are NOT persisted, since the Candidate model has no
+    corresponding database columns. They are echoed back in the response
+    only.
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=1, max_length=255)
+    position: str | None = None
+    phone: str | None = None
+
+
+class BulkCandidateRequest(BaseModel):
+    """Request model for bulk candidate import"""
+
+    candidates: list[BulkCandidateItem] = Field(min_length=1)
+
+
 def create_candidate_routes(candidate_manager) -> APIRouter:
     """Create candidate profile routes.
 
@@ -62,6 +83,48 @@ def create_candidate_routes(candidate_manager) -> APIRouter:
         except Exception as e:
             logger.error(f"Error creating candidate: {e!s}")
             raise HTTPException(status_code=500, detail="Error creating candidate")
+
+    @router.post("/candidates/bulk")
+    async def bulk_create_candidates(
+        request: BulkCandidateRequest,
+        session_db: Session = Depends(get_db),
+    ):
+        """Bulk-create candidate profiles from a CSV import.
+
+        Each candidate is processed independently: a failure on one row
+        does not prevent the others from being created. `position` and
+        `phone` are accepted but not persisted, since the Candidate model
+        has no corresponding columns.
+        """
+        created = []
+        errors = []
+
+        for index, item in enumerate(request.candidates):
+            try:
+                candidate = candidate_manager.create_candidate(
+                    name=item.name,
+                    email=item.email,
+                )
+                # Echo back the non-persisted fields for frontend visibility only.
+                candidate["position"] = item.position
+                candidate["phone"] = item.phone
+                created.append(candidate)
+            except Exception as e:
+                logger.error(f"Error creating candidate at row {index}: {e!s}")
+                errors.append(
+                    {
+                        "index": index,
+                        "email": item.email,
+                        "error": str(e),
+                    }
+                )
+
+        return {
+            "imported": len(created),
+            "failed": len(errors),
+            "candidates": created,
+            "errors": errors,
+        }
 
     @router.get("/candidates/{candidate_id}")
     async def get_candidate(
