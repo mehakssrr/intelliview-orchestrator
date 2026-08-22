@@ -10,6 +10,7 @@ from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from config import REDIS_URL
 from metrics.prometheus_metrics import TASKS_PERMANENTLY_FAILED
+from celery.schedules import crontab
 
 celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
 CeleryInstrumentor().instrument()
@@ -46,6 +47,10 @@ celery_app.conf.update(
         "scan-due-retries": {
             "task": "workers.tasks.scan_and_dispatch_retries",
             "schedule": 60.0,
+        },
+        "cleanup-dedup-keys-daily": {
+            "task": "workers.tasks.cleanup_expired_dedup_keys",
+            "schedule": crontab(hour=0, minute=0),
         },
     },
 )
