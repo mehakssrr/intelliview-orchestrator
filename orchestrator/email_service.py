@@ -6,6 +6,7 @@ Sends email notifications for scheduled interviews and other events.
 import html
 import logging
 import smtplib
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -33,6 +34,8 @@ class EmailService:
         """
         Send a confirmation email for a scheduled interview using smtplib.
 
+
+
         Args:
             candidate_name: Name of the candidate
             candidate_email: Email address of the candidate
@@ -49,6 +52,7 @@ class EmailService:
         host = self.settings.smtp_host or "localhost"
         port = self.settings.smtp_port or 1025
 
+
         # Sanitize HTML inputs to prevent injection vulnerabilities
         safe_name = html.escape(candidate_name)
         safe_email = html.escape(candidate_email)
@@ -60,10 +64,14 @@ class EmailService:
 
         subject = f"Interview Scheduled: AI Interview Session ({safe_date})"
 
+
         # Plain text fallback
         text_body = f"""Dear {candidate_name},
 
+
+
 Your interview has been successfully scheduled!
+
 
 Interview Details:
 ------------------
@@ -74,11 +82,14 @@ Time: {interview_time}
 Interviewer: {interviewer_name}
 {f'Notes: {notes}' if notes else ''}
 
+
 Please make sure to join on time. 
+
 
 Best regards,
 IntelliView Interview Team
 """
+
 
         # HTML Email format
         html_body = f"""<!DOCTYPE html>
@@ -100,8 +111,10 @@ IntelliView Interview Team
       <p style="color: #a1a1aa; font-size: 14px; margin-top: 4px;">Your AI technical interview has been scheduled.</p>
     </div>
 
+
     <p style="font-size: 15px;">Dear <strong>{safe_name}</strong>,</p>
     <p style="font-size: 14px; color: #d4d4d8;">We are pleased to invite you to your upcoming technical interview session. Below are the details:</p>
+
 
     <div style="background-color: #27272a; border-radius: 8px; padding: 16px; margin: 20px 0;">
       <table style="width: 100%; border-collapse: collapse;">
@@ -129,7 +142,9 @@ IntelliView Interview Team
       </table>
     </div>
 
+
     <p style="font-size: 14px; color: #a1a1aa;">Please ensure your camera and microphone are ready prior to the interview time.</p>
+
 
     <div class="footer">
       IntelliView AI Interview Platform &bull; Automated Notification
@@ -139,43 +154,83 @@ IntelliView Interview Team
 </html>
 """
 
+
         message = MIMEMultipart("alternative")
         message["Subject"] = subject
         message["From"] = sender_email
         message["To"] = candidate_email
 
+
         message.attach(MIMEText(text_body, "plain"))
         message.attach(MIMEText(html_body, "html"))
 
-        try:
-            logger.info(
-                f"Attempting to send email via SMTP to candidate via {host}:{port}"
-            )
-            # Use SSL if port 465, otherwise standard SMTP with optional TLS
-            if port == 465:
-                with smtplib.SMTP_SSL(host=host, port=port, timeout=10) as server:
-                    if self.settings.smtp_user and self.settings.smtp_password:
-                        server.login(
-                            self.settings.smtp_user, self.settings.smtp_password
-                        )
-                    server.send_message(message)
-            else:
-                with smtplib.SMTP(host=host, port=port, timeout=10) as server:
-                    if self.settings.smtp_use_tls:
-                        server.starttls()
-                    if self.settings.smtp_user and self.settings.smtp_password:
-                        server.login(
-                            self.settings.smtp_user, self.settings.smtp_password
-                        )
-                    server.send_message(message)
+        max_attempts = 3
+        last_error = None
 
-            logger.info("Email notification successfully dispatched.")
-            return True, "Email sent successfully"
+        for attempt in range(max_attempts):
+            try:
+                logger.info(
+                    "Attempting to send email via SMTP to candidate via "
+                    f"{host}:{port} (attempt {attempt + 1}/{max_attempts})"
+                )
 
-        except Exception as e:
-            error_msg = f"Failed to send email notification: {e!s}"
-            logger.warning(error_msg)
-            return False, error_msg
+                # Port 465 uses implicit SSL; other ports use regular SMTP.
+                if port == 465:
+                    with smtplib.SMTP_SSL(
+                        host=host,
+                        port=port,
+                        timeout=10,
+                    ) as server:
+                        if self.settings.smtp_user and self.settings.smtp_password:
+                            server.login(
+                                self.settings.smtp_user,
+                                self.settings.smtp_password,
+                            )
+                        server.send_message(message)
+                else:
+                    with smtplib.SMTP(
+                        host=host,
+                        port=port,
+                        timeout=10,
+                    ) as server:
+                        if self.settings.smtp_use_tls:
+                            server.starttls()
+
+                        if self.settings.smtp_user and self.settings.smtp_password:
+                            server.login(
+                                self.settings.smtp_user,
+                                self.settings.smtp_password,
+                            )
+
+                        server.send_message(message)
+
+                logger.info("Email notification successfully dispatched.")
+                return True, "Email sent successfully"
+
+            except (smtplib.SMTPException, OSError) as error:
+                last_error = error
+                logger.warning(
+                    "Email send attempt %s failed: %s",
+                    attempt + 1,
+                    error,
+                )
+
+                if attempt == max_attempts - 1:
+                    break
+
+                wait_time = 2 ** attempt
+                logger.info(
+                    "Retrying email send in %s second(s).",
+                    wait_time,
+                )
+                time.sleep(wait_time)
+
+        error_msg = (
+            "Failed to send email notification after "
+            f"{max_attempts} attempts: {last_error!s}"
+        )
+        logger.warning(error_msg)
+        return False, error_msg
 
 
 # Default instance
